@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO,
 
 class EmojiPicker(Gtk.Application):
     def __init__(self):
-        super().__init__(application_id='org.example.emojipicker',
+        super().__init__(application_id='org.v8v88v8v88.emojipicker',
                         flags=Gio.ApplicationFlags.FLAGS_NONE)
         self.window = None
         self.search_entry = None
