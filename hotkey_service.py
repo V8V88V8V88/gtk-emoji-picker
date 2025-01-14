@@ -1,133 +1,97 @@
 #!/usr/bin/env python3
+import os
+os.environ['GDK_BACKEND'] = 'x11'
+
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, GLib
-import os
-os.environ['GDK_BACKEND'] = 'x11'  # Force X11 for this application only
-
-from Xlib import X, XK, display
-from Xlib.ext import record
-from Xlib.protocol import rq
-import threading
+gi.require_version('Gdk', '4.0')
+gi.require_version('Gio', '2.0')
+from gi.repository import Gtk, Gdk, Gio, GLib
 import subprocess
-import sys
 import signal
+import sys
 import logging
 
-logging.basicConfig(level=logging.INFO,
+logging.basicConfig(level=logging.DEBUG,
                    format='%(asctime)s - %(levelname)s - %(message)s')
 
-class HotkeyService:
+class HotkeyListener(Gtk.Application):
     def __init__(self):
-        try:
-            self.local_display = display.Display()
-            self.record_display = display.Display()
-            self.context = None
-            self.keymap = {}
-            self.meta_pressed = False
-            
-            # Initialize keymap
-            for name in dir(XK):
-                if name.startswith("XK_"):
-                    self.keymap[getattr(XK, name)] = name[3:]
-            
-            logging.info("HotkeyService initialized successfully")
-        except Exception as e:
-            logging.error(f"Failed to initialize displays: {e}")
-            sys.exit(1)
+        super().__init__(application_id='org.example.emojipicker.hotkey',
+                        flags=Gio.ApplicationFlags.FLAGS_NONE)
+        self.window = None
+        
+    def do_activate(self):
+        # Create an invisible window to capture global hotkeys
+        self.window = Gtk.ApplicationWindow(application=self)
+        self.window.set_default_size(1, 1)
+        
+        # Make the window invisible but keep it running
+        self.window.set_opacity(0)
+        self.window.set_decorated(False)
+        self.window.set_skip_taskbar_hint(True)
+        self.window.set_skip_pager_hint(True)
+        
+        # Create a controller for key events
+        key_controller = Gtk.EventControllerKey()
+        key_controller.connect('key-pressed', self.on_key_pressed)
+        self.window.add_controller(key_controller)
+        
+        # Setup global keyboard shortcut
+        self.setup_global_shortcut()
+        
+        self.window.present()
+        logging.info("Hotkey listener started")
 
-    def print_key(self, keycode):
-        keysym = self.local_display.keycode_to_keysym(keycode, 0)
-        if keysym in self.keymap:
-            logging.debug(f"Key pressed: {self.keymap[keysym]}")
-        return keysym
+    def setup_global_shortcut(self):
+        action = Gio.SimpleAction.new('open-emoji-picker', None)
+        action.connect('activate', self.on_shortcut_activated)
+        self.add_action(action)
+        
+        # Set up the keyboard shortcut (Super/Meta + period)
+        self.set_accels_for_action('app.open-emoji-picker', ['<Super>period'])
+        logging.info("Global shortcut registered: Super + period")
 
-    def handler(self, reply):
-        if reply.category != record.FromServer:
-            return
-        if reply.client_swapped:
-            return
+    def on_shortcut_activated(self, action, parameter):
+        logging.info("Shortcut activated!")
+        self.launch_emoji_picker()
 
-        data = reply.data
-        while len(data):
-            event, data = rq.EventField(None).parse_binary_value(
-                data, self.record_display.display, None, None)
-
-            if event.type == X.KeyPress:
-                keysym = self.print_key(event.detail)
-                if keysym in (XK.XK_Super_L, XK.XK_Super_R):
-                    self.meta_pressed = True
-                    logging.debug("Meta key pressed")
-            elif event.type == X.KeyRelease:
-                keysym = self.print_key(event.detail)
-                if keysym in (XK.XK_Super_L, XK.XK_Super_R):
-                    self.meta_pressed = False
-                    logging.debug("Meta key released")
-                elif keysym == XK.XK_period and self.meta_pressed:
-                    logging.info("Hotkey combination detected (Meta + .)")
-                    self.launch_emoji_picker()
+    def on_key_pressed(self, controller, keyval, keycode, state):
+        logging.debug(f"Key pressed - keyval: {keyval}, keycode: {keycode}, state: {state}")
+        
+        # Check if Super/Meta is being held (state & Gdk.ModifierType.SUPER_MASK)
+        is_super = bool(state & Gdk.ModifierType.SUPER_MASK)
+        is_period = keyval == Gdk.KEY_period
+        
+        if is_super and is_period:
+            logging.info("Hotkey combination detected: Super + period")
+            self.launch_emoji_picker()
+            return True
+        return False
 
     def launch_emoji_picker(self):
         try:
             script_dir = os.path.dirname(os.path.abspath(__file__))
             emoji_picker_path = os.path.join(script_dir, 'emoji_picker.py')
             
-            # Launch emoji picker with X11 backend
             env = os.environ.copy()
             env['GDK_BACKEND'] = 'x11'
             
             logging.info(f"Launching emoji picker from: {emoji_picker_path}")
             subprocess.Popen([emoji_picker_path], env=env)
         except Exception as e:
-            logging.error(f"Failed to launch emoji picker: {e}")
-
-    def setup_record_context(self):
-        try:
-            self.context = self.record_display.record_create_context(
-                0,
-                [record.AllClients],
-                [{
-                    'core_requests': (0, 0),
-                    'core_replies': (0, 0),
-                    'ext_requests': (0, 0, 0, 0),
-                    'ext_replies': (0, 0, 0, 0),
-                    'delivered_events': (0, 0),
-                    'device_events': (X.KeyPress, X.KeyRelease),
-                    'errors': (0, 0),
-                    'client_started': False,
-                    'client_died': False,
-                }]
-            )
-            logging.info("Record context created successfully")
-        except Exception as e:
-            logging.error(f"Failed to create record context: {e}")
-            sys.exit(1)
-
-    def start(self):
-        logging.info("Starting hotkey service...")
-        self.setup_record_context()
-        
-        def signal_handler(signum, frame):
-            logging.info("Received signal to terminate")
-            if self.context:
-                self.record_display.record_free_context(self.context)
-            self.local_display.close()
-            self.record_display.close()
-            sys.exit(0)
-
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-
-        try:
-            self.record_display.record_enable_context(self.context, self.handler)
-        except Exception as e:
-            logging.error(f"Failed to enable record context: {e}")
-            self.record_display.record_free_context(self.context)
-            sys.exit(1)
+            logging.error(f"Failed to launch emoji picker: {e}", exc_info=True)
 
 def main():
-    service = HotkeyService()
-    service.start()
+    def signal_handler(signum, frame):
+        logging.info("Received signal to terminate")
+        app.quit()
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    app = HotkeyListener()
+    return app.run(None)
 
 if __name__ == '__main__':
     main()
