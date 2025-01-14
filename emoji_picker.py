@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
+import os
+os.environ['GDK_BACKEND'] = 'x11'  # Force X11 for this application only
+
 import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, GLib, Gio, Gdk
 import json
-from Xlib import display, X
-from Xlib.ext import record
-from Xlib.protocol import rq
-import threading
-import os
+import logging
+
+logging.basicConfig(level=logging.INFO,
+                   format='%(asctime)s - %(levelname)s - %(message)s')
 
 class EmojiPicker(Gtk.Application):
     def __init__(self):
@@ -19,9 +21,14 @@ class EmojiPicker(Gtk.Application):
         self.load_emojis()
         
     def load_emojis(self):
-        emoji_file = os.path.join(os.path.dirname(__file__), 'emojis.json')
-        with open(emoji_file, 'r', encoding='utf-8') as f:
-            self.emojis = json.load(f)
+        try:
+            emoji_file = os.path.join(os.path.dirname(__file__), 'emojis.json')
+            with open(emoji_file, 'r', encoding='utf-8') as f:
+                self.emojis = json.load(f)
+            logging.info("Emojis loaded successfully")
+        except Exception as e:
+            logging.error(f"Failed to load emojis: {e}")
+            self.emojis = []
     
     def do_activate(self):
         if not self.window:
@@ -75,10 +82,14 @@ class EmojiPicker(Gtk.Application):
         self.populate_emoji_list(entry.get_text())
     
     def on_emoji_selected(self, list_box, row):
-        emoji = self.emojis[row.get_index()]['emoji']
-        clipboard = Gdk.Display.get_default().get_clipboard()
-        clipboard.set_text(emoji)
-        self.window.close()
+        try:
+            emoji = self.emojis[row.get_index()]['emoji']
+            clipboard = Gdk.Display.get_default().get_clipboard()
+            clipboard.set_text(emoji)
+            logging.info(f"Copied emoji to clipboard: {emoji}")
+            self.window.close()
+        except Exception as e:
+            logging.error(f"Failed to copy emoji to clipboard: {e}")
 
 def main():
     app = EmojiPicker()
