@@ -13,7 +13,7 @@ A simple GTK4-based emoji picker that can be triggered globally using Meta + . s
 
 1. Clone the repository:
 ```bash
-git clone [repository-url]
+git clone https://github.com/V8V88V8V88/gtk-emoji-picker
 cd gtk-emoji-picker
 ```
 
