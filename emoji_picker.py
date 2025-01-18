@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 import os
-os.environ['GDK_BACKEND'] = 'x11'  # Force X11 for this application only
-
 import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, GLib, Gio, Gdk
@@ -13,11 +11,12 @@ logging.basicConfig(level=logging.INFO,
 
 class EmojiPicker(Gtk.Application):
     def __init__(self):
-        super().__init__(application_id='org.v8v88v8v88.emojipicker',
+        super().__init__(application_id='org.example.emojipicker',
                         flags=Gio.ApplicationFlags.FLAGS_NONE)
         self.window = None
         self.search_entry = None
         self.emoji_list = None
+        self.filtered_emojis = []
         self.load_emojis()
         
     def load_emojis(self):
@@ -28,7 +27,11 @@ class EmojiPicker(Gtk.Application):
             logging.info("Emojis loaded successfully")
         except Exception as e:
             logging.error(f"Failed to load emojis: {e}")
-            self.emojis = []
+            self.emojis = [
+                {"emoji": "😊", "name": "smiling face"},
+                {"emoji": "👍", "name": "thumbs up"},
+                {"emoji": "❤️", "name": "heart"}
+            ]  # Fallback emojis
     
     def do_activate(self):
         if not self.window:
@@ -56,9 +59,20 @@ class EmojiPicker(Gtk.Application):
             self.emoji_list.connect('row-activated', self.on_emoji_selected)
             scrolled.set_child(self.emoji_list)
             
+            # Add keyboard shortcut to close window
+            key_controller = Gtk.EventControllerKey.new()
+            key_controller.connect('key-pressed', self.on_key_pressed)
+            self.window.add_controller(key_controller)
+            
             self.populate_emoji_list()
             
         self.window.present()
+    
+    def on_key_pressed(self, controller, keyval, keycode, state):
+        if keyval == Gdk.KEY_Escape:
+            self.window.close()
+            return True
+        return False
     
     def populate_emoji_list(self, filter_text=None):
         # Clear existing items
@@ -69,10 +83,12 @@ class EmojiPicker(Gtk.Application):
             else:
                 break
         
-        # Add filtered emojis
+        # Filter and store emojis
+        self.filtered_emojis = []
         for emoji in self.emojis:
             if filter_text and filter_text.lower() not in emoji['name'].lower():
                 continue
+            self.filtered_emojis.append(emoji)
             
             label = Gtk.Label(label=f"{emoji['emoji']} {emoji['name']}")
             label.set_halign(Gtk.Align.START)
@@ -83,11 +99,13 @@ class EmojiPicker(Gtk.Application):
     
     def on_emoji_selected(self, list_box, row):
         try:
-            emoji = self.emojis[row.get_index()]['emoji']
-            clipboard = Gdk.Display.get_default().get_clipboard()
-            clipboard.set_text(emoji)
-            logging.info(f"Copied emoji to clipboard: {emoji}")
-            self.window.close()
+            index = row.get_index()
+            if 0 <= index < len(self.filtered_emojis):
+                emoji = self.filtered_emojis[index]['emoji']
+                clipboard = Gdk.Display.get_default().get_clipboard()
+                clipboard.set(emoji)
+                logging.info(f"Copied emoji to clipboard: {emoji}")
+                self.window.close()
         except Exception as e:
             logging.error(f"Failed to copy emoji to clipboard: {e}")
 
