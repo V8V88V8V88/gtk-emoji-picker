@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 import os
-os.environ['GDK_BACKEND'] = 'x11'
-
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
@@ -28,12 +26,10 @@ class HotkeyListener(Gtk.Application):
         
         # Make the window invisible but keep it running
         self.window.set_opacity(0)
-        self.window.set_decorated(False)
-        self.window.set_skip_taskbar_hint(True)
-        self.window.set_skip_pager_hint(True)
+        self.window.set_visible(False)  # Changed from deprecated methods
         
-        # Create a controller for key events
-        key_controller = Gtk.EventControllerKey()
+        # Create an event controller for key events
+        key_controller = Gtk.EventControllerKey.new()
         key_controller.connect('key-pressed', self.on_key_pressed)
         self.window.add_controller(key_controller)
         
@@ -48,9 +44,8 @@ class HotkeyListener(Gtk.Application):
         action.connect('activate', self.on_shortcut_activated)
         self.add_action(action)
         
-        # Set up the keyboard shortcut (Super/Meta + period)
-        self.set_accels_for_action('app.open-emoji-picker', ['<Super>period'])
-        logging.info("Global shortcut registered: Super + period")
+        self.set_accels_for_action('app.open-emoji-picker', ['<Meta>period'])
+        logging.info("Global shortcut registered: Meta + period")
 
     def on_shortcut_activated(self, action, parameter):
         logging.info("Shortcut activated!")
@@ -59,12 +54,13 @@ class HotkeyListener(Gtk.Application):
     def on_key_pressed(self, controller, keyval, keycode, state):
         logging.debug(f"Key pressed - keyval: {keyval}, keycode: {keycode}, state: {state}")
         
-        # Check if Super/Meta is being held (state & Gdk.ModifierType.SUPER_MASK)
+        # Check for both Meta and Super keys
+        is_meta = bool(state & Gdk.ModifierType.META_MASK)
         is_super = bool(state & Gdk.ModifierType.SUPER_MASK)
         is_period = keyval == Gdk.KEY_period
         
-        if is_super and is_period:
-            logging.info("Hotkey combination detected: Super + period")
+        if (is_meta or is_super) and is_period:
+            logging.info("Hotkey combination detected: Meta/Super + period")
             self.launch_emoji_picker()
             return True
         return False
@@ -74,11 +70,16 @@ class HotkeyListener(Gtk.Application):
             script_dir = os.path.dirname(os.path.abspath(__file__))
             emoji_picker_path = os.path.join(script_dir, 'emoji_picker.py')
             
-            env = os.environ.copy()
-            env['GDK_BACKEND'] = 'x11'
+            if not os.path.isfile(emoji_picker_path):
+                logging.error(f"Emoji picker not found at: {emoji_picker_path}")
+                return
+                
+            if not os.access(emoji_picker_path, os.X_OK):
+                logging.info("Setting executable permission on emoji picker")
+                os.chmod(emoji_picker_path, 0o755)
             
             logging.info(f"Launching emoji picker from: {emoji_picker_path}")
-            subprocess.Popen([emoji_picker_path], env=env)
+            subprocess.Popen([sys.executable, emoji_picker_path])
         except Exception as e:
             logging.error(f"Failed to launch emoji picker: {e}", exc_info=True)
 
