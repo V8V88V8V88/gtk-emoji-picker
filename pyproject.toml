@@ -1,0 +1,127 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gtk-emoji-picker"
+version = "0.1.0"
+description = "A lightweight GTK4 emoji picker desktop utility"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "GTK Emoji Picker Team" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: X11 Applications :: GTK",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Desktop Environment",
+]
+
+dependencies = [
+    "PyGObject>=3.48.0",
+]
+
+[project.optional-dependencies]
+x11 = [
+    "pynput>=1.7.0",
+    "python-xlib>=0.33",
+]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.6.0",
+    "flake8>=7.0.0",
+    "black>=24.0.0",
+    "mypy>=1.11.0",
+]
+
+[project.scripts]
+gtk-emoji-picker = "gtk_emoji_picker.__main__:main"
+gtk-emoji-picker-daemon = "gtk_emoji_picker.infrastructure.shortcut_daemon:main"
+
+[tool.setuptools]
+py-modules = ["emoji_picker", "emoji_repository", "hotkey_service"]
+
+[tool.setuptools.package-dir]
+"" = "."
+gtk_emoji_picker = "src/gtk_emoji_picker"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+
+[tool.setuptools.package-data]
+gtk_emoji_picker = ["resources/emojis.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.format]
+quote-style = "preserve"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]
+"emoji_picker.py" = ["E402"]
+"hotkey_service.py" = ["E402"]
+"src/gtk_emoji_picker/infrastructure/*" = ["E402"]
+"src/gtk_emoji_picker/infrastructure/shortcut_backends/*" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["gtk_emoji_picker"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+no_implicit_optional = true
+disallow_any_generics = true
+check_untyped_defs = true
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = [
+    "gi.*",
+    "pynput.*",
+    "Xlib.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "emoji_picker",
+    "emoji_repository",
+    "hotkey_service",
+    "test_emoji_picker",
+    "test_shortcut_daemon",
+    "test_domain_and_services",
+]
+ignore_errors = true
+
+

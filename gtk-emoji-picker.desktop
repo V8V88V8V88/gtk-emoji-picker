@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=GTK Emoji Picker
+GenericName=Emoji Picker
+Comment=Lightweight GTK4 Emoji Picker desktop utility
+Exec=gtk-emoji-picker
+Icon=input-gaming
+Terminal=false
+Type=Application
+Categories=Utility;GTK;
+Keywords=emoji;picker;gtk;emoticon;
+StartupWMClass=gtk-emoji-picker
+X-GNOME-Autostart-enabled=true

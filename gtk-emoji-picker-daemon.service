@@ -1,0 +1,15 @@
+[Unit]
+Description=GTK Emoji Picker Global Shortcut Daemon
+Documentation=https://github.com/V8V88V8V88/gtk-emoji-picker
+After=graphical-session.target
+Wants=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=gtk-emoji-picker-daemon
+Restart=on-failure
+RestartSec=5s
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=graphical-session.target
